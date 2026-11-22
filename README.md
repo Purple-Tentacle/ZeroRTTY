@@ -9,10 +9,9 @@ connection and no sound card are involved.
 
 ![Terminal](screenshot/zerortty-terminal.png) ![Menu](screenshot/zerortty-menu.png)
 
-**Status: 0.1.0, not yet run on a real CardputerZero or against a real KX2.**
-It is built and tested on x86 against a simulated radio (see
-[What has been tested](#what-has-been-tested)). The serial settings and the
-`FA;` / `TB;` replies were confirmed on a real KX2 by hand.
+**Status: 0.1.0.** Built on a CardputerZero and used with a KX2 over the KXUSB
+cable: receive, transmit, macros, keyboard and display work. Two details of the
+radio's behaviour are still open, see [What has been tested](#what-has-been-tested).
 
 ## What you need
 
@@ -196,14 +195,20 @@ terminal behaviour (line and immediate mode, macros, editing, setup) and the
 settings file. The UI was checked with scripted screenshots in the desktop
 build, and the CardputerZero configuration compiles and packages.
 
-Not tested, because it needs the hardware:
+On a CardputerZero with a KX2 (November 2026): building and packaging on the
+device, the serial link at 38400 baud, decoded receive text, transmitting from
+`zerortty_cli` and from the app, the end-of-over marker (a macro returns to
+receive at once, while immediate mode shows the radio's four-second idle tail),
+the keyboard including `TAB` and the `Fn` combinations, and the display.
 
-- the device keyboard (key codes for `Fn`, `Sym` and `Shift` combinations);
-  unknown key codes are logged as `unmapped key code N`
-- display, fonts and layout on the real screen
-- everything against a real KX2: how FSK D treats the punctuation marks, whether
-  the radio reports its own transmitted text back as received text, and the
-  timing of the end-of-over marker
+Still open:
+
+- how FSK D sends the punctuation marks `. , ? / -`
+- whether the radio reports its own transmitted text back as received text, in
+  which case it would appear twice in the scrollback
+
+A key the app does not know is logged as `unmapped key code N`
+(`journalctl | grep unmapped`).
 
 ## Credits
 
