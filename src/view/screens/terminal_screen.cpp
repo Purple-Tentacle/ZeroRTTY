@@ -5,6 +5,7 @@
 #include "asset_manager.h"
 #include "theme.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <string>
 
@@ -222,15 +223,24 @@ void TerminalScreen::render(rtty::Terminal& terminal, bool dark_mode, bool small
     lv_obj_set_style_border_color(input_bar_, colors.border, 0);
     std::string input;
     if (status.line_mode) {
+        // Show the stretch of the line around the cursor: "_" marks the cursor
+        // at the end, "|" inside the text, "<" and ">" that more is hidden.
         const auto& line = terminal.input_line();
-        input = "> ";
+        const std::size_t cursor = terminal.input_cursor();
+        std::size_t first = 0;
         if (line.size() > kInputTail) {
-            input += "<" + line.substr(line.size() - kInputTail);
+            const std::size_t lead = kInputTail - 4;
+            first = cursor > lead ? cursor - lead : 0;
+            first = std::min(first, line.size() - kInputTail);
         }
-        else {
-            input += line;
+        const std::size_t last = std::min(line.size(), first + kInputTail);
+        input = first > 0 ? "> <" : "> ";
+        input += line.substr(first, cursor - first);
+        input += cursor >= line.size() ? "_" : "|";
+        input += line.substr(cursor, last - cursor);
+        if (last < line.size()) {
+            input += ">";
         }
-        input += "_";
         lv_obj_set_style_text_color(input_, colors.text, 0);
     }
     else {

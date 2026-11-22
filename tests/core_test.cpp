@@ -373,6 +373,47 @@ void test_terminal() {
     CHECK(wait_for([&] { return sim.end_of_over_count() == 1; }));
     CHECK_EQ(sim.transmitted(), std::string("HELLO ALL "));
 
+    // The cursor moves inside the line: insert, delete and overwrite a typo
+    // in the middle without retyping the rest.
+    const auto press = [&](rtty::Key::Kind kind, int times = 1) {
+        for (int index = 0; index < times; ++index) {
+            terminal.handle_key(rtty::Key::of(kind));
+        }
+    };
+    type(terminal, "cq de da2t");
+    press(rtty::Key::Kind::Left);
+    CHECK(terminal.input_cursor() == 9);
+    type(terminal, "i");
+    CHECK_EQ(terminal.input_line(), std::string("CQ DE DA2IT"));
+    CHECK(terminal.input_cursor() == 10);
+    press(rtty::Key::Kind::Home);
+    CHECK(terminal.input_cursor() == 0);
+    press(rtty::Key::Kind::Left);
+    press(rtty::Key::Kind::Backspace);
+    CHECK_EQ(terminal.input_line(), std::string("CQ DE DA2IT"));
+    type(terminal, "x");
+    press(rtty::Key::Kind::Delete, 3);
+    CHECK_EQ(terminal.input_line(), std::string("XDE DA2IT"));
+    press(rtty::Key::Kind::Backspace);
+    type(terminal, "cq ");
+    CHECK_EQ(terminal.input_line(), std::string("CQ DE DA2IT"));
+    press(rtty::Key::Kind::Right, 2);
+    CHECK(terminal.input_cursor() == 5);
+    press(rtty::Key::Kind::End);
+    press(rtty::Key::Kind::Right);
+    press(rtty::Key::Kind::Delete);
+    CHECK(terminal.input_cursor() == 11);
+    type(terminal, " k");
+    press(rtty::Key::Kind::Home);
+    // ENTER sends the whole line wherever the cursor is.
+    press(rtty::Key::Kind::Enter);
+    CHECK_EQ(terminal.input_line(), std::string());
+    CHECK(terminal.input_cursor() == 0);
+    CHECK(wait_for([&] { return sim.end_of_over_count() == 2; }));
+    CHECK_EQ(sim.transmitted(), std::string("HELLO ALL CQ DE DA2IT K "));
+    const std::string after_cursor_test = sim.transmitted();
+    const int overs_after_cursor_test = sim.end_of_over_count();
+
     // Characters RTTY cannot carry are refused with a message.
     terminal.take_notice();
     type(terminal, "<");
@@ -383,7 +424,7 @@ void test_terminal() {
     terminal.handle_key(rtty::Key::function(3));
     CHECK(!terminal.take_notice().empty());
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
-    CHECK_EQ(sim.transmitted(), std::string("HELLO ALL "));
+    CHECK_EQ(sim.transmitted(), after_cursor_test);
 
     // Fn+9 sets the DX call; then the macro goes out with both calls filled in.
     terminal.handle_key(rtty::Key::function(9));
@@ -393,8 +434,17 @@ void test_terminal() {
     CHECK(terminal.overlay() == rtty::Overlay::None);
     CHECK_EQ(terminal.status().dx_call, std::string("W1AW"));
     terminal.handle_key(rtty::Key::function(3));
-    CHECK(wait_for([&] { return sim.end_of_over_count() == 2; }));
-    CHECK_EQ(sim.transmitted(), std::string("HELLO ALL W1AW DE DA2IT 599 599 K "));
+    CHECK(wait_for([&] { return sim.end_of_over_count() == overs_after_cursor_test + 1; }));
+    CHECK_EQ(sim.transmitted(), after_cursor_test + "W1AW DE DA2IT 599 599 K ");
+
+    // The same cursor works in the editors: fix the middle of the DX call.
+    terminal.handle_key(rtty::Key::function(9));
+    press(rtty::Key::Kind::Left, 2);
+    press(rtty::Key::Kind::Backspace);
+    type(terminal, "2");
+    CHECK(terminal.overlay_text().find("W2|AW") != std::string::npos);
+    press(rtty::Key::Kind::Escape);
+    CHECK_EQ(terminal.status().dx_call, std::string("W1AW"));
 
     // Contest serial: [NR] is the current number, three digits. It stays the
     // same for repeats and moves on when a new DX call is entered afterwards.
@@ -402,7 +452,7 @@ void test_terminal() {
     CHECK_EQ(terminal.status().serial, std::string("001"));
     terminal.handle_key(rtty::Key::function(8));
     terminal.handle_key(rtty::Key::function(8));
-    CHECK(wait_for([&] { return sim.end_of_over_count() == 4; }));
+    CHECK(wait_for([&] { return sim.end_of_over_count() == overs_after_cursor_test + 3; }));
     CHECK(sim.transmitted().find("W1AW 599 001 001 W1AW 599 001 001 ") != std::string::npos);
     CHECK(settings.serial == 1);
     // Re-entering the same call is a correction, not a new QSO.
@@ -425,7 +475,7 @@ void test_terminal() {
     terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Enter));
     CHECK(settings.serial == 2);
     terminal.handle_key(rtty::Key::function(8));
-    CHECK(wait_for([&] { return sim.end_of_over_count() == 5; }));
+    CHECK(wait_for([&] { return sim.end_of_over_count() == overs_after_cursor_test + 4; }));
     CHECK(sim.transmitted().find("DL1ABCX 599 002 002 ") != std::string::npos);
     // The number can be set by hand from the menu; only digits are taken.
     terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Tab));
@@ -510,7 +560,7 @@ void test_terminal() {
         return terminal.scrollback().find("DA2IT DE W1AW 599") != std::string::npos;
     }));
     const auto& scrollback = terminal.scrollback();
-    CHECK(scrollback.find("> HELLO ALL W1AW DE DA2IT 599 599 K") == 0);
+    CHECK(scrollback.find("> HELLO ALL CQ DE DA2IT K W1AW DE DA2IT 599 599 K") == 0);
     CHECK(scrollback.find("\nDA2IT DE W1AW 599") != std::string::npos);
 
     // Setup: baud cycles through the rates the KX2 offers and wraps.

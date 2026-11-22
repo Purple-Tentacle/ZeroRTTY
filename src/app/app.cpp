@@ -203,8 +203,19 @@ private:
                     translated = rtty::Key::of(Kind::Enter);
                     break;
                 case LV_KEY_BACKSPACE:
-                case LV_KEY_DEL:
                     translated = rtty::Key::of(Kind::Backspace);
+                    break;
+                case LV_KEY_DEL:
+                    translated = rtty::Key::of(Kind::Delete);
+                    break;
+                case LV_KEY_LEFT:
+                    translated = rtty::Key::of(Kind::Left);
+                    break;
+                case LV_KEY_RIGHT:
+                    translated = rtty::Key::of(Kind::Right);
+                    break;
+                case LV_KEY_HOME:
+                    translated = rtty::Key::of(Kind::Home);
                     break;
                 case LV_KEY_ESC:
                     translated = rtty::Key::of(Kind::Escape);
@@ -278,7 +289,7 @@ private:
 
 // Test hook: ZERORTTY_TEST_KEYS types a script after start-up, one key every
 // 120 ms. "\n" Enter, "\t" Tab, "\e" Esc, "\b" Backspace, "\h" Help,
-// "\1".."\9" and "\0" Fn+digit, "\u" / "\d" scroll, "\w" waits one second.
+// "\1".."\9" and "\0" Fn+digit, "\u" / "\d" scroll, "\l" / "\r" cursor, "\w" waits one second.
 class KeyScript {
 public:
     KeyScript(TerminalController& controller, const char* script)
@@ -337,6 +348,12 @@ private:
                 break;
             case 'd':
                 controller_.inject(rtty::Key::of(Kind::Down));
+                break;
+            case 'l':
+                controller_.inject(rtty::Key::of(Kind::Left));
+                break;
+            case 'r':
+                controller_.inject(rtty::Key::of(Kind::Right));
                 break;
             case '0':
                 controller_.inject(rtty::Key::function(10));

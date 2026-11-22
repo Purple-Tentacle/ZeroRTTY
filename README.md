@@ -9,7 +9,7 @@ connection and no sound card are involved.
 
 ![Terminal](screenshot/zerortty-terminal.png) ![Menu](screenshot/zerortty-menu.png)
 
-**Status: 0.2.0.** Built on a CardputerZero and used with a KX2 over the KXUSB
+**Status: 0.2.1.** Built on a CardputerZero and used with a KX2 over the KXUSB
 cable: receive, transmit, macros, keyboard and display work.
 
 ## What you need
@@ -32,7 +32,8 @@ PSK31 or Morse.
 | Key | Action |
 | --- | --- |
 | type, `ENTER` | Line mode: send the line, then return to receive. Immediate mode: end the over. |
-| `Backspace` | Correct the line before it is sent (line mode) |
+| `Backspace` | Delete the character before the cursor (line mode) |
+| `Fn`+`Z` / `Fn`+`C` | Move the cursor left / right in the line, to fix a typo in the middle |
 | `TAB` | Menu: macros, DX call, setup |
 | `Fn`+`1`..`8` | Send macro 1-8 |
 | `Fn`+`9` | Set the DX call (fills `[CALL]` in macros) |
@@ -51,6 +52,9 @@ The status bar shows frequency and mode, the DX call, `LINE`/`IMM` and `RX`/`TX`
 with the number of characters still waiting. It turns red while transmitting and
 orange when something is wrong (no port, no reply from the radio, radio in a mode
 that does not transmit text).
+
+The cursor in the input line is shown as `_` at the end and as `|` inside the
+text. The same keys move the cursor when editing a macro, a call or the port.
 
 Sent text appears in the scrollback on lines starting with `>`.
 
@@ -129,7 +133,7 @@ Install into the launcher:
 
 ```sh
 (cd build/cp0-native && cpack -C Release -G DEB)
-sudo apt install ./dist/ZeroRTTY_0.2.0_rev1_arm64.deb
+sudo apt install ./dist/ZeroRTTY_0.2.1_rev1_arm64.deb
 ```
 
 If the status bar says `No port /dev/ttyUSB0: Permission denied`, the user the
@@ -202,7 +206,7 @@ when the radio goes away — nothing is transmitted later by surprise.
 
 ## What has been tested
 
-On x86, against the simulated KX2 (`zerortty_test`, 196 checks): the reply
+On x86, against the simulated KX2 (`zerortty_test`, 211 checks): the reply
 parser, the transmit flow control at 6 and 60 characters per second, receive
 text, stopping a transmission, a missing port, a silent radio, wrong mode, the
 terminal behaviour (line and immediate mode, macros, serial numbers, editing,

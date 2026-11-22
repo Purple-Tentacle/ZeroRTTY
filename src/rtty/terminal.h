@@ -25,7 +25,11 @@ struct Key {
         Down,
         PageUp,
         PageDown,
+        Left,
+        Right,
+        Home,
         End,
+        Delete,
         Help,
     };
 
@@ -36,6 +40,33 @@ struct Key {
     static Key of(Kind kind) { return Key{kind, 0, 0}; }
     static Key text(char character) { return Key{Kind::Character, character, 0}; }
     static Key function(int number) { return Key{Kind::Function, 0, number}; }
+};
+
+// A line of text with an insertion point, for the input line and the editors.
+class LineEdit {
+public:
+    const std::string& text() const { return text_; }
+    std::size_t cursor() const { return cursor_; }
+    bool empty() const { return text_.empty(); }
+
+    // Replaces the text and puts the cursor at its end.
+    void set(const std::string& text);
+    void clear() { set({}); }
+    // Inserts at the cursor unless the text already has `limit` characters.
+    bool insert(char character, std::size_t limit);
+    // Each returns true if something changed.
+    bool backspace();
+    bool erase();
+    bool left();
+    bool right();
+    bool home();
+    bool end();
+    // The text with a cursor mark: "_" at the end, "|" inside the text.
+    std::string with_cursor() const;
+
+private:
+    std::string text_;
+    std::size_t cursor_{0};
 };
 
 enum class Overlay {
@@ -76,7 +107,8 @@ public:
 
     Overlay overlay() const { return overlay_; }
     const std::string& scrollback() const { return scrollback_; }
-    const std::string& input_line() const { return input_; }
+    const std::string& input_line() const { return input_.text(); }
+    std::size_t input_cursor() const { return input_.cursor(); }
     std::string overlay_text() const;
     StatusView status() const;
 
@@ -116,7 +148,7 @@ private:
     Hooks hooks_;
 
     Overlay overlay_{Overlay::None};
-    std::string input_;
+    LineEdit input_;
     std::string dx_call_;
     std::string scrollback_;
     Direction last_direction_{Direction::None};
@@ -130,7 +162,7 @@ private:
     Field edit_field_{Field::MyCall};
     std::size_t edit_macro_{0};
     Overlay edit_return_{Overlay::None};
-    std::string edit_value_;
+    LineEdit edit_value_;
 
     int scroll_lines_{0};
     bool follow_request_{false};

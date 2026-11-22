@@ -77,6 +77,76 @@ std::string preview(const std::string& text, std::size_t width) {
 
 } // namespace
 
+void LineEdit::set(const std::string& text) {
+    text_ = text;
+    cursor_ = text_.size();
+}
+
+bool LineEdit::insert(char character, std::size_t limit) {
+    if (text_.size() >= limit) {
+        return false;
+    }
+    text_.insert(cursor_, 1, character);
+    ++cursor_;
+    return true;
+}
+
+bool LineEdit::backspace() {
+    if (cursor_ == 0) {
+        return false;
+    }
+    --cursor_;
+    text_.erase(cursor_, 1);
+    return true;
+}
+
+bool LineEdit::erase() {
+    if (cursor_ >= text_.size()) {
+        return false;
+    }
+    text_.erase(cursor_, 1);
+    return true;
+}
+
+bool LineEdit::left() {
+    if (cursor_ == 0) {
+        return false;
+    }
+    --cursor_;
+    return true;
+}
+
+bool LineEdit::right() {
+    if (cursor_ >= text_.size()) {
+        return false;
+    }
+    ++cursor_;
+    return true;
+}
+
+bool LineEdit::home() {
+    if (cursor_ == 0) {
+        return false;
+    }
+    cursor_ = 0;
+    return true;
+}
+
+bool LineEdit::end() {
+    if (cursor_ == text_.size()) {
+        return false;
+    }
+    cursor_ = text_.size();
+    return true;
+}
+
+std::string LineEdit::with_cursor() const {
+    if (cursor_ >= text_.size()) {
+        return text_ + "_";
+    }
+    return text_.substr(0, cursor_) + "|" + text_.substr(cursor_);
+}
+
 Terminal::Terminal(Settings& settings, Kx2Link& link, Hooks hooks)
     : settings_(settings), link_(link), hooks_(std::move(hooks)) {}
 
@@ -297,9 +367,7 @@ void Terminal::handle_main_key(const Key& key) {
             }
             follow_request_ = true;
             if (settings_.line_mode) {
-                if (input_.size() < kMaxInput) {
-                    input_.push_back(character);
-                }
+                input_.insert(character, kMaxInput);
             }
             else if (ready_to_send()) {
                 link_.send_text(std::string(1, character));
@@ -311,8 +379,27 @@ void Terminal::handle_main_key(const Key& key) {
             if (!settings_.line_mode) {
                 notify("Immediate mode: already sent");
             }
-            else if (!input_.empty()) {
-                input_.pop_back();
+            else if (input_.backspace()) {
+                changed();
+            }
+            return;
+        case Key::Kind::Delete:
+            if (settings_.line_mode && input_.erase()) {
+                changed();
+            }
+            return;
+        case Key::Kind::Left:
+            if (settings_.line_mode && input_.left()) {
+                changed();
+            }
+            return;
+        case Key::Kind::Right:
+            if (settings_.line_mode && input_.right()) {
+                changed();
+            }
+            return;
+        case Key::Kind::Home:
+            if (settings_.line_mode && input_.home()) {
                 changed();
             }
             return;
@@ -324,7 +411,7 @@ void Terminal::handle_main_key(const Key& key) {
                 if (!ready_to_send()) {
                     return;
                 }
-                link_.send_text(input_ + " ");
+                link_.send_text(input_.text() + " ");
                 input_.clear();
             }
             link_.end_over();
@@ -371,6 +458,9 @@ void Terminal::handle_main_key(const Key& key) {
             changed();
             return;
         case Key::Kind::End:
+            if (settings_.line_mode) {
+                input_.end();
+            }
             follow_request_ = true;
             changed();
             return;
@@ -510,19 +600,19 @@ void Terminal::begin_edit(Field field, std::size_t macro_index, Overlay return_t
     menu_edit_armed_ = false;
     switch (field) {
         case Field::MyCall:
-            edit_value_ = settings_.my_call;
+            edit_value_.set(settings_.my_call);
             break;
         case Field::DxCall:
-            edit_value_ = dx_call_;
+            edit_value_.set(dx_call_);
             break;
         case Field::Device:
-            edit_value_ = settings_.device;
+            edit_value_.set(settings_.device);
             break;
         case Field::Macro:
-            edit_value_ = settings_.macros[macro_index];
+            edit_value_.set(settings_.macros[macro_index]);
             break;
         case Field::Serial:
-            edit_value_ = std::to_string(settings_.serial);
+            edit_value_.set(std::to_string(settings_.serial));
             break;
     }
     overlay_ = Overlay::Edit;
@@ -536,25 +626,25 @@ void Terminal::commit_edit() {
                 notify("The call cannot be empty");
                 return;
             }
-            settings_.my_call = edit_value_;
+            settings_.my_call = edit_value_.text();
             settings_changed();
             break;
         case Field::DxCall:
             // A new station after the number has been given out is the next
             // QSO. Correcting the call before sending it changes nothing.
-            if (serial_used_ && !edit_value_.empty() && edit_value_ != dx_call_ &&
+            if (serial_used_ && !edit_value_.empty() && edit_value_.text() != dx_call_ &&
                 settings_.serial < kMaxSerial) {
                 ++settings_.serial;
                 serial_used_ = false;
                 notify("Next serial: " + format_serial(settings_.serial));
-                dx_call_ = edit_value_;
+                dx_call_ = edit_value_.text();
                 settings_changed();
                 break;
             }
-            dx_call_ = edit_value_;
+            dx_call_ = edit_value_.text();
             break;
         case Field::Serial: {
-            const int serial = edit_value_.empty() ? 0 : std::atoi(edit_value_.c_str());
+            const int serial = edit_value_.empty() ? 0 : std::atoi(edit_value_.text().c_str());
             if (serial < 1 || serial > kMaxSerial) {
                 notify("The serial must be 1 or more");
                 return;
@@ -569,11 +659,11 @@ void Terminal::commit_edit() {
                 notify("The port cannot be empty");
                 return;
             }
-            settings_.device = edit_value_;
+            settings_.device = edit_value_.text();
             settings_changed();
             break;
         case Field::Macro:
-            settings_.macros[edit_macro_] = edit_value_;
+            settings_.macros[edit_macro_] = edit_value_.text();
             settings_changed();
             break;
     }
@@ -591,8 +681,32 @@ void Terminal::handle_edit_key(const Key& key) {
             commit_edit();
             return;
         case Key::Kind::Backspace:
-            if (!edit_value_.empty()) {
-                edit_value_.pop_back();
+            if (edit_value_.backspace()) {
+                changed();
+            }
+            return;
+        case Key::Kind::Delete:
+            if (edit_value_.erase()) {
+                changed();
+            }
+            return;
+        case Key::Kind::Left:
+            if (edit_value_.left()) {
+                changed();
+            }
+            return;
+        case Key::Kind::Right:
+            if (edit_value_.right()) {
+                changed();
+            }
+            return;
+        case Key::Kind::Home:
+            if (edit_value_.home()) {
+                changed();
+            }
+            return;
+        case Key::Kind::End:
+            if (edit_value_.end()) {
                 changed();
             }
             return;
@@ -634,8 +748,7 @@ void Terminal::handle_edit_key(const Key& key) {
             break;
     }
 
-    if (edit_value_.size() < limit) {
-        edit_value_.push_back(character);
+    if (edit_value_.insert(character, limit)) {
         changed();
     }
 }
@@ -685,7 +798,7 @@ std::string Terminal::overlay_text() const {
                     text = "NEXT SERIAL NUMBER  (sent for [NR])\n";
                     break;
             }
-            text += "\n" + edit_value_ + "_\n\n";
+            text += "\n" + edit_value_.with_cursor() + "\n\n";
             text += "ENTER save   ESC cancel";
             break;
         case Overlay::Help:
@@ -697,8 +810,8 @@ std::string Terminal::overlay_text() const {
                    "Fn+0       line / immediate mode\n"
                    "ESC        stop sending   hold: exit\n"
                    "Fn+F Fn+X  scroll up / down\n"
-                   "Fn+H help  Fn+J screenshot\n"
-                   "\nAny key closes this.";
+                   "Fn+Z Fn+C  move the cursor in the line\n"
+                   "Fn+H help  Fn+J screenshot   any key closes";
             break;
     }
     return text;
