@@ -29,7 +29,12 @@ void usage() {
 bool wait_for_radio(rtty::Kx2Link& link) {
     for (int attempt = 0; attempt < 40; ++attempt) {
         const auto status = link.status();
-        if (status.radio_responding && status.mode != 0 && status.frequency_hz != 0) {
+        // The frequency, mode and data sub-mode replies arrive one after the
+        // other. In DATA mode the sub-mode decides whether text can be sent,
+        // so do not report before it is known.
+        const bool data_mode = status.mode == 6 || status.mode == 9;
+        if (status.radio_responding && status.mode != 0 && status.frequency_hz != 0 &&
+            (!data_mode || status.data_sub_mode >= 0)) {
             return true;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
