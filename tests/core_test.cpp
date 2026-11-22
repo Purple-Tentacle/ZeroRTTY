@@ -3,6 +3,7 @@
 // Tests for the parts of ZeroRTTY that do not draw: the reply parser, the
 // serial link (against a simulated KX2), the terminal behaviour and settings.
 
+#include "cardputer_keymap.h"
 #include "kx2_link.h"
 #include "kx2_protocol.h"
 #include "kx2_sim.h"
@@ -490,6 +491,43 @@ void test_terminal() {
     link.stop();
 }
 
+void test_cardputer_keymap() {
+    // Built-in table: the Sym layer of the CardputerZero keyboard.
+    platform::CardputerKeymap keymap;
+    CHECK(keymap.lookup(90) == ',');
+    CHECK(keymap.lookup(91) == '.');
+    CHECK(keymap.lookup(92) == '/');
+    CHECK(keymap.lookup(93) == '?');
+    CHECK(keymap.lookup(71) == '-');
+    CHECK(keymap.lookup(74) == '[');
+    CHECK(keymap.lookup(75) == ']');
+    // 51 is KEY_COMMA on a PC keyboard but '&' here.
+    CHECK(keymap.lookup(51) == '&');
+    // Letters, digits and unknown codes are left to the ordinary mapping.
+    CHECK(keymap.lookup(30) == 0);
+    CHECK(keymap.lookup(2) == 0);
+    CHECK(keymap.lookup(300) == 0);
+
+    // A keymap file in the image replaces the table.
+    const int count = keymap.load_text("# comment\n"
+                                       "keycode 90 = period   # swapped\n"
+                                       "keycode 91 = comma\n"
+                                       "  keycode 100 = question\n"
+                                       "keycode 101 = NoSuchName\n"
+                                       "garbage line\n");
+    CHECK(count == 3);
+    CHECK(keymap.lookup(90) == '.');
+    CHECK(keymap.lookup(91) == ',');
+    CHECK(keymap.lookup(100) == '?');
+    CHECK(keymap.lookup(101) == 0);
+    CHECK(keymap.lookup(92) == 0);
+
+    // A file without usable lines keeps what was there.
+    CHECK(keymap.load_text("nothing here\n") == 0);
+    CHECK(keymap.lookup(90) == '.');
+    CHECK(keymap.load_file("/nonexistent/keymap.map") == 0);
+}
+
 void test_settings() {
     const auto directory = std::filesystem::temp_directory_path() / "zerortty-test";
     std::filesystem::remove_all(directory);
@@ -547,6 +585,7 @@ void test_settings() {
 int main() {
     test_parser();
     test_sanitize();
+    test_cardputer_keymap();
     test_settings();
     test_link_transmit();
     test_link_slow_radio_never_overflows();

@@ -9,7 +9,7 @@ connection and no sound card are involved.
 
 ![Terminal](screenshot/zerortty-terminal.png) ![Menu](screenshot/zerortty-menu.png)
 
-**Status: 0.1.0.** Built on a CardputerZero and used with a KX2 over the KXUSB
+**Status: 0.1.1.** Built on a CardputerZero and used with a KX2 over the KXUSB
 cable: receive, transmit, macros, keyboard and display work. One detail of the
 radio's behaviour is still open, see [What has been tested](#what-has-been-tested).
 
@@ -116,7 +116,7 @@ Install into the launcher:
 
 ```sh
 (cd build/cp0-native && cpack -C Release -G DEB)
-sudo apt install ./dist/ZeroRTTY_0.1.0_rev1_arm64.deb
+sudo apt install ./dist/ZeroRTTY_0.1.1_rev1_arm64.deb
 ```
 
 If the status bar says `No port /dev/ttyUSB0: Permission denied`, the user the
@@ -188,7 +188,7 @@ when the radio goes away — nothing is transmitted later by surprise.
 
 ## What has been tested
 
-On x86, against the simulated KX2 (`zerortty_test`, 156 checks): the reply
+On x86, against the simulated KX2 (`zerortty_test`, 176 checks): the reply
 parser, the transmit flow control at 6 and 60 characters per second, receive
 text, stopping a transmission, a missing port, a silent radio, wrong mode, the
 terminal behaviour (line and immediate mode, macros, editing, setup) and the

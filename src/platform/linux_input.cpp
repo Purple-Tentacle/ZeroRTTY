@@ -1,5 +1,9 @@
 #include "linux_input.h"
 
+#if !USE_DESKTOP
+#include "cardputer_keymap.h"
+#endif
+
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -41,6 +45,9 @@ constexpr uint32_t kLongPressMs = 700;
 #if !USE_DESKTOP
 struct EvdevKeypad {
     int fd{-1};
+    // True for the CardputerZero's built-in keyboard, whose Sym layer uses
+    // key codes of its own. False for a USB or Bluetooth keyboard.
+    bool cardputer_keyboard{false};
     lv_indev_state_t state{LV_INDEV_STATE_RELEASED};
     uint32_t key{0};
     bool router_event_pending{false};
@@ -234,7 +241,28 @@ bool track_modifier(uint16_t code, int32_t value) {
     }
 }
 
-uint32_t map_evdev_key(uint16_t code) {
+CardputerKeymap& cardputer_keymap() {
+    static CardputerKeymap keymap;
+    static bool loaded = false;
+    if (!loaded) {
+        loaded = true;
+        const int count = keymap.load_file(kCardputerKeymapPath);
+        if (count > 0) {
+            LV_LOG_INFO("loaded %d Sym-layer keys from %s", count, kCardputerKeymapPath);
+        }
+    }
+    return keymap;
+}
+
+uint32_t map_evdev_key(uint16_t code, bool cardputer_keyboard) {
+    if (cardputer_keyboard) {
+        // These codes overlap ordinary ones (51 is '&' here, KEY_COMMA on a
+        // PC keyboard), so they are looked up first.
+        if (const char symbol = cardputer_keymap().lookup(code)) {
+            return static_cast<uint32_t>(static_cast<unsigned char>(symbol));
+        }
+    }
+
     switch (code) {
         case KEY_ESC:
             return LV_KEY_ESC;
@@ -320,7 +348,7 @@ void evdev_read_cb(lv_indev_t* indev, lv_indev_data_t* data) {
             continue;
         }
 
-        const auto key = map_evdev_key(input.code);
+        const auto key = map_evdev_key(input.code, keypad->cardputer_keyboard);
         if (!key && input.value == 1) {
             // Shows up in the journal, so an unexpected key code from the
             // device keyboard can be identified and added to the table.
@@ -359,6 +387,14 @@ void evdev_delete_cb(lv_event_t* event) {
 lv_indev_t* create_keypad_from_fd(int fd) {
     auto* keypad = new EvdevKeypad;
     keypad->fd = fd;
+
+    // The built-in keyboard sits on I2C; anything on USB or Bluetooth is an
+    // ordinary keyboard with ordinary key codes.
+    input_id identity{};
+    if (ioctl(fd, EVIOCGID, &identity) == 0) {
+        keypad->cardputer_keyboard = identity.bustype != BUS_USB &&
+                                     identity.bustype != BUS_BLUETOOTH;
+    }
 
     auto* indev = lv_indev_create();
     if (!indev) {

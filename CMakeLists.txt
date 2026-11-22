@@ -6,7 +6,7 @@
 
 cmake_minimum_required(VERSION 3.31)
 
-project(zerortty VERSION 0.1.0 LANGUAGES C CXX)
+project(zerortty VERSION 0.1.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -430,8 +430,8 @@ if(ZERORTTY_BUILD_TOOLS)
     target_include_directories(zerortty_kx2sim PRIVATE tests)
     target_link_libraries(zerortty_kx2sim PRIVATE Threads::Threads)
 
-    add_executable(zerortty_test tests/core_test.cpp)
-    target_include_directories(zerortty_test PRIVATE tests)
+    add_executable(zerortty_test tests/core_test.cpp src/platform/cardputer_keymap.cpp)
+    target_include_directories(zerortty_test PRIVATE tests src/platform)
     target_link_libraries(zerortty_test PRIVATE ${PROJECT_NAME}_rtty)
 
     enable_testing()
