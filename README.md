@@ -10,8 +10,8 @@ connection and no sound card are involved.
 ![Terminal](screenshot/zerortty-terminal.png) ![Menu](screenshot/zerortty-menu.png)
 
 **Status: 0.1.0.** Built on a CardputerZero and used with a KX2 over the KXUSB
-cable: receive, transmit, macros, keyboard and display work. Two details of the
-radio's behaviour are still open, see [What has been tested](#what-has-been-tested).
+cable: receive, transmit, macros, keyboard and display work. One detail of the
+radio's behaviour is still open, see [What has been tested](#what-has-been-tested).
 
 ## What you need
 
@@ -199,13 +199,11 @@ On a CardputerZero with a KX2 (November 2026): building and packaging on the
 device, the serial link at 38400 baud, decoded receive text, transmitting from
 `zerortty_cli` and from the app, the end-of-over marker (a macro returns to
 receive at once, while immediate mode shows the radio's four-second idle tail),
-the keyboard including `TAB` and the `Fn` combinations, and the display.
+the keyboard including `TAB` and the `Fn` combinations, and the display. The
+radio does not report its own transmitted text back as received text, so sent
+text appears once.
 
-Still open:
-
-- how FSK D sends the punctuation marks `. , ? / -`
-- whether the radio reports its own transmitted text back as received text, in
-  which case it would appear twice in the scrollback
+Still open: how FSK D sends the punctuation marks `. , ? / -`.
 
 A key the app does not know is logged as `unmapped key code N`
 (`journalctl | grep unmapped`).
