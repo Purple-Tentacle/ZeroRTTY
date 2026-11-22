@@ -57,6 +57,7 @@ struct StatusView {
     bool line_mode{true};
     std::size_t queued{0};
     std::string dx_call;
+    std::string serial;     // "001"; empty unless a macro uses [NR]
     std::string problem;    // text for NoPort / NoRadio
 };
 
@@ -89,7 +90,7 @@ public:
     unsigned revision() const { return revision_; }
 
 private:
-    enum class Field { MyCall, DxCall, Device, Macro };
+    enum class Field { MyCall, DxCall, Device, Macro, Serial };
     enum class Direction { None, Received, Sent };
 
     void handle_main_key(const Key& key);
@@ -101,6 +102,7 @@ private:
     bool ready_to_send();
     void send_macro(std::size_t index);
     void toggle_line_mode();
+    bool macros_use_serial() const;
     void begin_edit(Field field, std::size_t macro_index, Overlay return_to);
     void commit_edit();
     void append_scrollback(Direction direction, const std::string& text);
@@ -119,6 +121,10 @@ private:
     std::string scrollback_;
     Direction last_direction_{Direction::None};
     LinkStatus link_status_;
+
+    // True once the current serial number has gone out in a macro; the next
+    // new DX call then moves on to the next number.
+    bool serial_used_{false};
 
     bool menu_edit_armed_{false};
     Field edit_field_{Field::MyCall};

@@ -396,12 +396,78 @@ void test_terminal() {
     CHECK(wait_for([&] { return sim.end_of_over_count() == 2; }));
     CHECK_EQ(sim.transmitted(), std::string("HELLO ALL W1AW DE DA2IT 599 599 K "));
 
+    // Contest serial: [NR] is the current number, three digits. It stays the
+    // same for repeats and moves on when a new DX call is entered afterwards.
+    CHECK_EQ(settings.macros[7], std::string("[CALL] 599 [NR] [NR]"));
+    CHECK_EQ(terminal.status().serial, std::string("001"));
+    terminal.handle_key(rtty::Key::function(8));
+    terminal.handle_key(rtty::Key::function(8));
+    CHECK(wait_for([&] { return sim.end_of_over_count() == 4; }));
+    CHECK(sim.transmitted().find("W1AW 599 001 001 W1AW 599 001 001 ") != std::string::npos);
+    CHECK(settings.serial == 1);
+    // Re-entering the same call is a correction, not a new QSO.
+    terminal.handle_key(rtty::Key::function(9));
+    terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Enter));
+    CHECK(settings.serial == 1);
+    terminal.take_notice();
+    terminal.handle_key(rtty::Key::function(9));
+    for (int index = 0; index < 4; ++index) {
+        terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Backspace));
+    }
+    type(terminal, "dl1abc");
+    terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Enter));
+    CHECK(settings.serial == 2);
+    CHECK(terminal.take_notice().find("002") != std::string::npos);
+    CHECK_EQ(terminal.status().serial, std::string("002"));
+    // A second new call without the number having gone out does not skip one.
+    terminal.handle_key(rtty::Key::function(9));
+    type(terminal, "x");
+    terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Enter));
+    CHECK(settings.serial == 2);
+    terminal.handle_key(rtty::Key::function(8));
+    CHECK(wait_for([&] { return sim.end_of_over_count() == 5; }));
+    CHECK(sim.transmitted().find("DL1ABCX 599 002 002 ") != std::string::npos);
+    // The number can be set by hand from the menu; only digits are taken.
+    terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Tab));
+    type(terminal, "n");
+    CHECK(terminal.overlay() == rtty::Overlay::Edit);
+    terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Backspace));
+    type(terminal, "1x234");
+    terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Enter));
+    CHECK(terminal.overlay() == rtty::Overlay::Menu);
+    CHECK(settings.serial == 1234);
+    CHECK_EQ(terminal.status().serial, std::string("1234"));
+    // Zero is refused and the editor stays open.
+    type(terminal, "n");
+    for (int index = 0; index < 4; ++index) {
+        terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Backspace));
+    }
+    type(terminal, "0");
+    terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Enter));
+    CHECK(terminal.overlay() == rtty::Overlay::Edit);
+    CHECK(settings.serial == 1234);
+    terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Escape));
+    terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Escape));
+    CHECK(terminal.overlay() == rtty::Overlay::None);
+    // Back to the state the following checks expect.
+    terminal.handle_key(rtty::Key::function(9));
+    for (int index = 0; index < 7; ++index) {
+        terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Backspace));
+    }
+    type(terminal, "w1aw");
+    terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Enter));
+    const std::string before_macro_edit = sim.transmitted();
+    const int overs_before_macro_edit = sim.end_of_over_count();
+
     // Menu: E then 8 edits macro 8, and the change is saved.
     const int saves_before = saves;
     terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Tab));
     CHECK(terminal.overlay() == rtty::Overlay::Menu);
     type(terminal, "e8");
     CHECK(terminal.overlay() == rtty::Overlay::Edit);
+    for (int index = 0; index < 30; ++index) {
+        terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Backspace));
+    }
     type(terminal, "tu [my] test");
     terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Enter));
     CHECK(terminal.overlay() == rtty::Overlay::Menu);
@@ -411,9 +477,8 @@ void test_terminal() {
     // Menu: a digit sends that macro and closes the menu.
     type(terminal, "8");
     CHECK(terminal.overlay() == rtty::Overlay::None);
-    CHECK(wait_for([&] { return sim.end_of_over_count() == 3; }));
-    CHECK_EQ(sim.transmitted(),
-             std::string("HELLO ALL W1AW DE DA2IT 599 599 K TU DA2IT TEST "));
+    CHECK(wait_for([&] { return sim.end_of_over_count() == overs_before_macro_edit + 1; }));
+    CHECK_EQ(sim.transmitted(), before_macro_edit + "TU DA2IT TEST ");
 
     // Cancelling an edit keeps the old value.
     terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Tab));
@@ -434,7 +499,7 @@ void test_terminal() {
     }));
     CHECK_EQ(terminal.input_line(), std::string());
     terminal.handle_key(rtty::Key::of(rtty::Key::Kind::Enter));
-    CHECK(wait_for([&] { return sim.end_of_over_count() == 4; }));
+    CHECK(wait_for([&] { return sim.end_of_over_count() == overs_before_macro_edit + 2; }));
     terminal.handle_key(rtty::Key::function(10));
     CHECK(settings.line_mode);
 
@@ -442,7 +507,7 @@ void test_terminal() {
     sim.receive("DA2IT DE W1AW 599");
     CHECK(wait_for([&] {
         terminal.tick();
-        return terminal.scrollback().find("W1AW 599") != std::string::npos;
+        return terminal.scrollback().find("DA2IT DE W1AW 599") != std::string::npos;
     }));
     const auto& scrollback = terminal.scrollback();
     CHECK(scrollback.find("> HELLO ALL W1AW DE DA2IT 599 599 K") == 0);
@@ -541,6 +606,7 @@ void test_settings() {
     written.baud = 9600;
     written.macros[2] = "[CALL] DE [MY] = 599";
     written.macros[6] = "";
+    written.serial = 137;
     std::string error;
     CHECK(rtty::save_settings(path, written, error));
 
@@ -553,6 +619,7 @@ void test_settings() {
     CHECK(read.baud == 9600);
     CHECK_EQ(read.macros[2], std::string("[CALL] DE [MY] = 599"));
     CHECK_EQ(read.macros[6], std::string());
+    CHECK(read.serial == 137);
     CHECK_EQ(read.macros[0], std::string("CQ CQ CQ DE [MY] [MY] [MY] K"));
 
     // A file with only some keys leaves the rest alone.

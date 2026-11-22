@@ -4,6 +4,7 @@
 
 #include <cctype>
 #include <cstdio>
+#include <cstdlib>
 #include <utility>
 
 namespace rtty {
@@ -14,6 +15,8 @@ constexpr std::size_t kMaxScrollback = 4000;
 constexpr std::size_t kMaxCall = 12;
 constexpr std::size_t kMaxDevice = 64;
 constexpr std::size_t kMaxMacro = 100;
+constexpr std::size_t kMaxSerialDigits = 5;
+constexpr int kMaxSerial = 99999;
 constexpr std::size_t kMenuMacroPreview = 38;
 constexpr int kScrollStep = 3;
 constexpr int kPageStep = 8;
@@ -38,6 +41,17 @@ void replace_all(std::string& text, const std::string& from, const std::string& 
 
 bool contains_call_placeholder(const std::string& text) {
     return text.find("[CALL]") != std::string::npos || text.find("{CALL}") != std::string::npos;
+}
+
+bool contains_serial_placeholder(const std::string& text) {
+    return text.find("[NR]") != std::string::npos || text.find("{NR}") != std::string::npos;
+}
+
+// Contest style: at least three digits, "001".
+std::string format_serial(int serial) {
+    char buffer[16];
+    std::snprintf(buffer, sizeof(buffer), "%03d", serial);
+    return buffer;
 }
 
 std::string format_frequency(long long hz) {
@@ -143,10 +157,22 @@ void Terminal::tick() {
     link_status_ = status;
 }
 
+bool Terminal::macros_use_serial() const {
+    for (const auto& macro : settings_.macros) {
+        if (contains_serial_placeholder(macro)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 StatusView Terminal::status() const {
     StatusView view;
     view.line_mode = settings_.line_mode;
     view.dx_call = dx_call_;
+    if (macros_use_serial()) {
+        view.serial = format_serial(settings_.serial);
+    }
     view.queued = link_status_.queued;
     view.transmitting = link_status_.transmitting;
 
@@ -243,12 +269,18 @@ void Terminal::send_macro(std::size_t index) {
     replace_all(text, "{MY}", settings_.my_call);
     replace_all(text, "[CALL]", dx_call_);
     replace_all(text, "{CALL}", dx_call_);
+    const bool uses_serial = contains_serial_placeholder(text);
+    replace_all(text, "[NR]", format_serial(settings_.serial));
+    replace_all(text, "{NR}", format_serial(settings_.serial));
 
     if (link_.send_text(text + " ").empty()) {
         notify("Macro " + std::to_string(index + 1) + " has nothing to send");
         return;
     }
     link_.end_over();
+    if (uses_serial) {
+        serial_used_ = true;
+    }
     follow_request_ = true;
     changed();
 }
@@ -406,6 +438,9 @@ void Terminal::handle_menu_key(const Key& key) {
         case 'C':
             begin_edit(Field::DxCall, 0, Overlay::None);
             break;
+        case 'N':
+            begin_edit(Field::Serial, 0, Overlay::Menu);
+            break;
         case 'S':
             overlay_ = Overlay::Setup;
             changed();
@@ -486,6 +521,9 @@ void Terminal::begin_edit(Field field, std::size_t macro_index, Overlay return_t
         case Field::Macro:
             edit_value_ = settings_.macros[macro_index];
             break;
+        case Field::Serial:
+            edit_value_ = std::to_string(settings_.serial);
+            break;
     }
     overlay_ = Overlay::Edit;
     changed();
@@ -502,8 +540,30 @@ void Terminal::commit_edit() {
             settings_changed();
             break;
         case Field::DxCall:
+            // A new station after the number has been given out is the next
+            // QSO. Correcting the call before sending it changes nothing.
+            if (serial_used_ && !edit_value_.empty() && edit_value_ != dx_call_ &&
+                settings_.serial < kMaxSerial) {
+                ++settings_.serial;
+                serial_used_ = false;
+                notify("Next serial: " + format_serial(settings_.serial));
+                dx_call_ = edit_value_;
+                settings_changed();
+                break;
+            }
             dx_call_ = edit_value_;
             break;
+        case Field::Serial: {
+            const int serial = edit_value_.empty() ? 0 : std::atoi(edit_value_.c_str());
+            if (serial < 1 || serial > kMaxSerial) {
+                notify("The serial must be 1 or more");
+                return;
+            }
+            settings_.serial = serial;
+            serial_used_ = false;
+            settings_changed();
+            break;
+        }
         case Field::Device:
             if (edit_value_.empty()) {
                 notify("The port cannot be empty");
@@ -566,6 +626,12 @@ void Terminal::handle_edit_key(const Key& key) {
         case Field::Macro:
             character = to_upper(character);
             break;
+        case Field::Serial:
+            if (!std::isdigit(static_cast<unsigned char>(character))) {
+                return;
+            }
+            limit = kMaxSerialDigits;
+            break;
     }
 
     if (edit_value_.size() < limit) {
@@ -588,7 +654,7 @@ std::string Terminal::overlay_text() const {
             }
             text += std::string("M ") + (settings_.line_mode ? "line mode" : "immediate mode") +
                     "    C DX call " + (dx_call_.empty() ? "-" : dx_call_) + "\n";
-            text += "S setup  D set FSK-D  X clear  ESC close";
+            text += "N serial " + format_serial(settings_.serial) + "  S setup  D FSK-D  X clear";
             break;
         case Overlay::Setup:
             text = "SETUP\n";
@@ -613,7 +679,10 @@ std::string Terminal::overlay_text() const {
                     break;
                 case Field::Macro:
                     text = "MACRO " + std::to_string(edit_macro_ + 1) +
-                           "   [MY] = my call, [CALL] = DX call\n";
+                           "   use [MY] [CALL] [NR]\n";
+                    break;
+                case Field::Serial:
+                    text = "NEXT SERIAL NUMBER  (sent for [NR])\n";
                     break;
             }
             text += "\n" + edit_value_ + "_\n\n";

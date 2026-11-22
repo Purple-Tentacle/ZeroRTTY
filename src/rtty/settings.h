@@ -15,6 +15,8 @@ struct Settings {
     bool small_font{false};
     bool line_mode{true};
     std::string my_call{"NOCALL"};
+    // Next contest serial number, sent for [NR] in macros.
+    int serial{1};
     std::string device{"/dev/ttyUSB0"};
     int baud{38400};
     // Punctuation to allow in transmitted text beyond ". , ? / -".
@@ -27,7 +29,7 @@ struct Settings {
         "QRZ DE [MY] K",
         "[CALL] AGN AGN K",
         "[MY]",
-        "",
+        "[CALL] 599 [NR] [NR]",
     }};
 };
 

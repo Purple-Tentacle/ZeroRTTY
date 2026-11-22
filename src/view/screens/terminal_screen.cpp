@@ -177,6 +177,9 @@ void TerminalScreen::render(rtty::Terminal& terminal, bool dark_mode, bool small
         if (!status.dx_call.empty()) {
             right += status.dx_call + "  ";
         }
+        if (!status.serial.empty()) {
+            right += "#" + status.serial + "  ";
+        }
         right += status.line_mode ? "LINE  " : "IMM  ";
         if (status.transmitting) {
             right += "TX";

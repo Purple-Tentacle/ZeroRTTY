@@ -9,7 +9,7 @@ connection and no sound card are involved.
 
 ![Terminal](screenshot/zerortty-terminal.png) ![Menu](screenshot/zerortty-menu.png)
 
-**Status: 0.1.1.** Built on a CardputerZero and used with a KX2 over the KXUSB
+**Status: 0.2.0.** Built on a CardputerZero and used with a KX2 over the KXUSB
 cable: receive, transmit, macros, keyboard and display work.
 
 ## What you need
@@ -59,14 +59,16 @@ Sent text appears in the scrollback on lines starting with `>`.
 - `1`..`8` sends that macro, `E` then `1`..`8` edits it
 - `M` line / immediate mode
 - `C` DX call
+- `N` next serial number
 - `S` setup: my call, serial port, baud rate, text size, light / dark
 - `D` sets the KX2 to DATA / FSK D
 - `X` clears the screen
 
 ### Macros
 
-`[MY]` is replaced by your call, `[CALL]` by the DX call. A macro with `[CALL]`
-is not sent until a DX call is set. Defaults:
+`[MY]` is replaced by your call, `[CALL]` by the DX call and `[NR]` by the
+contest serial number. A macro with `[CALL]` is not sent until a DX call is set.
+Defaults:
 
 ```
 1  CQ CQ CQ DE [MY] [MY] [MY] K
@@ -76,8 +78,20 @@ is not sent until a DX call is set. Defaults:
 5  QRZ DE [MY] K
 6  [CALL] AGN AGN K
 7  [MY]
-8  (empty)
+8  [CALL] 599 [NR] [NR]
 ```
+
+### Serial numbers
+
+`[NR]` sends the current serial number with at least three digits (`001`). The
+status bar shows it as `#001` as soon as one of the macros uses it.
+
+The number stays the same however often you send it, so repeats are safe. It
+moves on by one when you enter a **new DX call** (`Fn`+`9`) after the number has
+gone out: a new station is the next QSO. Re-entering the same call, or changing
+the call before the number was sent, does not count. `TAB`, `N` sets the number
+by hand, for the start of a contest or to correct it. It is saved across
+restarts.
 
 ### What can be sent
 
@@ -115,7 +129,7 @@ Install into the launcher:
 
 ```sh
 (cd build/cp0-native && cpack -C Release -G DEB)
-sudo apt install ./dist/ZeroRTTY_0.1.1_rev1_arm64.deb
+sudo apt install ./dist/ZeroRTTY_0.2.0_rev1_arm64.deb
 ```
 
 If the status bar says `No port /dev/ttyUSB0: Permission denied`, the user the
@@ -135,6 +149,7 @@ line_mode=yes
 
 [station]
 my_call=DA2IT
+serial=1
 
 [radio]
 device=/dev/ttyUSB0
@@ -187,11 +202,11 @@ when the radio goes away — nothing is transmitted later by surprise.
 
 ## What has been tested
 
-On x86, against the simulated KX2 (`zerortty_test`, 176 checks): the reply
+On x86, against the simulated KX2 (`zerortty_test`, 196 checks): the reply
 parser, the transmit flow control at 6 and 60 characters per second, receive
 text, stopping a transmission, a missing port, a silent radio, wrong mode, the
-terminal behaviour (line and immediate mode, macros, editing, setup) and the
-settings file. The UI was checked with scripted screenshots in the desktop
+terminal behaviour (line and immediate mode, macros, serial numbers, editing,
+setup), the keyboard's Sym-layer table and the settings file. The UI was checked with scripted screenshots in the desktop
 build, and the CardputerZero configuration compiles and packages.
 
 On a CardputerZero with a KX2 (November 2026): building and packaging on the

@@ -84,6 +84,12 @@ bool load_settings(const std::string& path, Settings& settings, std::string& err
         }
         else if (section == "station") {
             if (key == "my_call") settings.my_call = value;
+            if (key == "serial") {
+                char* end = nullptr;
+                const long serial = std::strtol(value.c_str(), &end, 10);
+                if (value.empty() || *end != '\0' || serial < 1 || serial > 99999) return fail(key);
+                settings.serial = static_cast<int>(serial);
+            }
         }
         else if (section == "radio") {
             if (key == "device") {
@@ -139,6 +145,7 @@ bool save_settings(const std::string& path, const Settings& settings, std::strin
                << "line_mode=" << yes_no(settings.line_mode) << '\n'
                << "\n[station]\n"
                << "my_call=" << settings.my_call << '\n'
+               << "serial=" << settings.serial << '\n'
                << "\n[radio]\n"
                << "device=" << settings.device << '\n'
                << "baud=" << settings.baud << '\n'
