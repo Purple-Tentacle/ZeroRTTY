@@ -1,0 +1,30 @@
+{
+  "app_name": "ZeroRTTY",
+  "package_name": "zerortty",
+  "version": "0.1.0",
+  "description": "RTTY keyboard terminal for the Elecraft KX2",
+
+  "store": {
+    "summary": "Type RTTY on an Elecraft KX2: the radio does the modem, the CardputerZero is the keyboard and screen.",
+    "description": "ZeroRTTY turns the CardputerZero into a keyboard terminal for the Elecraft KX2's built-in RTTY mode (FSK D). Text you type is sent through the radio's own encoder over the KXUSB cable, and the text the radio decodes is shown on screen. Line mode lets you correct a line before it goes out; immediate mode sends each key as typed. Eight editable macros with call sign placeholders cover the usual CQ and exchange. Also works in the KX2's PSK D and CW modes. Requires an Elecraft KX2 (or KX3) and a KXUSB cable.",
+    "categories": ["Radio & Comms"],
+    "screenshots": [
+      "screenshot/zerortty-terminal.png",
+      "screenshot/zerortty-menu.png"
+    ],
+    "icon": "assets/store/icon.png",
+    "license": "MIT",
+    "source_repo": "https://github.com/Purple-Tentacle/ZeroRTTY",
+    "author": { "github": "Purple-Tentacle", "display_name": "DA2IT" },
+    "share_code": "RTTY",
+    "permissions": {
+      "camera": false,
+      "microphone": false,
+      "imu": false,
+      "network": false,
+      "additional_hardware": true,
+      "background_service": false,
+      "external_display": false
+    }
+  }
+}

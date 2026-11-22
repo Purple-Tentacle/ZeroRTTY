@@ -1,0 +1,135 @@
+// SPDX-License-Identifier: MIT
+//
+// The behaviour of the ZeroRTTY terminal, without any drawing: what a key does
+// in each state, what is queued for the radio and what text is on screen.
+
+#pragma once
+
+#include "kx2_link.h"
+#include "settings.h"
+
+#include <functional>
+#include <string>
+
+namespace rtty {
+
+struct Key {
+    enum class Kind {
+        Character,
+        Enter,
+        Backspace,
+        Escape,
+        Tab,
+        Function, // number = 1..10
+        Up,
+        Down,
+        PageUp,
+        PageDown,
+        End,
+        Help,
+    };
+
+    Kind kind{Kind::Character};
+    char character{0};
+    int number{0};
+
+    static Key of(Kind kind) { return Key{kind, 0, 0}; }
+    static Key text(char character) { return Key{Kind::Character, character, 0}; }
+    static Key function(int number) { return Key{Kind::Function, 0, number}; }
+};
+
+enum class Overlay {
+    None,
+    Menu,
+    Setup,
+    Edit,
+    Help,
+};
+
+struct StatusView {
+    enum class Link { NoPort, NoRadio, Ready };
+
+    Link link{Link::NoPort};
+    std::string frequency;  // "14.085.00", empty when unknown
+    std::string mode;       // "FSK-D", empty when unknown
+    bool mode_sends_text{true};
+    bool transmitting{false};
+    bool line_mode{true};
+    std::size_t queued{0};
+    std::string dx_call;
+    std::string problem;    // text for NoPort / NoRadio
+};
+
+class Terminal {
+public:
+    struct Hooks {
+        // Settings changed and should be saved and applied.
+        std::function<void()> settings_changed;
+    };
+
+    Terminal(Settings& settings, Kx2Link& link, Hooks hooks);
+
+    void handle_key(const Key& key);
+    // Collects text and status from the link. Call a few times per second.
+    void tick();
+
+    Overlay overlay() const { return overlay_; }
+    const std::string& scrollback() const { return scrollback_; }
+    const std::string& input_line() const { return input_; }
+    std::string overlay_text() const;
+    StatusView status() const;
+
+    // Lines to scroll since the last call (negative = towards older text).
+    int take_scroll_lines();
+    // True once after the view should jump back to the newest text.
+    bool take_follow_request();
+    // A short message for the user, empty if there is none.
+    std::string take_notice();
+    // Changes whenever something visible changed.
+    unsigned revision() const { return revision_; }
+
+private:
+    enum class Field { MyCall, DxCall, Device, Macro };
+    enum class Direction { None, Received, Sent };
+
+    void handle_main_key(const Key& key);
+    void handle_menu_key(const Key& key);
+    void handle_setup_key(const Key& key);
+    void handle_edit_key(const Key& key);
+
+    // Explains why nothing can be sent right now; true if sending is possible.
+    bool ready_to_send();
+    void send_macro(std::size_t index);
+    void toggle_line_mode();
+    void begin_edit(Field field, std::size_t macro_index, Overlay return_to);
+    void commit_edit();
+    void append_scrollback(Direction direction, const std::string& text);
+    void notify(const std::string& message);
+    void changed() { ++revision_; }
+    void settings_changed();
+    LinkOptions link_options() const;
+
+    Settings& settings_;
+    Kx2Link& link_;
+    Hooks hooks_;
+
+    Overlay overlay_{Overlay::None};
+    std::string input_;
+    std::string dx_call_;
+    std::string scrollback_;
+    Direction last_direction_{Direction::None};
+    LinkStatus link_status_;
+
+    bool menu_edit_armed_{false};
+    Field edit_field_{Field::MyCall};
+    std::size_t edit_macro_{0};
+    Overlay edit_return_{Overlay::None};
+    std::string edit_value_;
+
+    int scroll_lines_{0};
+    bool follow_request_{false};
+    std::string notice_;
+    unsigned revision_{1};
+};
+
+} // namespace rtty
