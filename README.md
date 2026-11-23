@@ -10,7 +10,8 @@ connection and no sound card are involved.
 ![Terminal](screenshot/zerortty-terminal.png) ![Menu](screenshot/zerortty-menu.png)
 
 **Status: 0.2.1.** Built on a CardputerZero and used with a KX2 over the KXUSB
-cable: receive, transmit, macros, keyboard and display work.
+cable: receive, transmit, macros, keyboard and display work, and a first on-air
+test between two radios passed in both directions.
 
 ## What you need
 
@@ -220,6 +221,10 @@ receive at once, while immediate mode shows the radio's four-second idle tail),
 the keyboard including `TAB`, the `Fn` combinations and the Sym layer, the
 display, and the punctuation marks `. , ? / -` in FSK D. The radio does not
 report its own transmitted text back as received text, so sent text appears once.
+
+On the air: sending and receiving between two radios on the same table worked.
+That was a basic test only. A QSO with a distant station and operation in a
+contest have not been tried yet.
 
 A key the app does not know is logged as `unmapped key code N`
 (`journalctl | grep unmapped`).
