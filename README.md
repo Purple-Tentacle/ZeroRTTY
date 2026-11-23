@@ -219,7 +219,8 @@ device, the serial link at 38400 baud, decoded receive text, transmitting from
 `zerortty_cli` and from the app, the end-of-over marker (a macro returns to
 receive at once, while immediate mode shows the radio's four-second idle tail),
 the keyboard including `TAB`, the `Fn` combinations and the Sym layer, the
-display, and the punctuation marks `. , ? / -` in FSK D. The radio does not
+cursor in the input line, the `[NR]` serial numbers, the display, and the
+punctuation marks `. , ? / -` in FSK D. The radio does not
 report its own transmitted text back as received text, so sent text appears once.
 
 On the air: sending and receiving between two radios on the same table worked.
